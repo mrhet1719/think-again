@@ -25,14 +25,14 @@ const PROFILE = {
     { id: 3, name: "Aggressive Payoff", range: "June+", status: "upcoming" },
   ],
   expenseCategories: [
-    { id: "transport", name: "Transport", budget: 100, icon: "\u{1F697}" },
-    { id: "subscriptions", name: "Subscriptions", budget: 25, icon: "\u{1F4F1}" },
-    { id: "car_insurance", name: "Car Insurance", budget: 70, icon: "\u{1F6E1}" },
-    { id: "health_insurance", name: "Health Insurance", budget: 30, icon: "\u{1F3E5}" },
-    { id: "emi", name: "EMI (House)", budget: 50, icon: "\u{1F3E0}" },
-    { id: "family", name: "Family Support", budget: 25, icon: "\u{1F468}\u200D\u{1F469}\u200D\u{1F466}" },
-    { id: "rego", name: "Rego", budget: 20, icon: "\u{1F4CB}" },
-    { id: "lifestyle", name: "Lifestyle", budget: 100, icon: "\u{1F3AF}" },
+    { id: "transport", name: "Transport", budget: 100, icon: "🚗" },
+    { id: "subscriptions", name: "Subscriptions", budget: 25, icon: "📱" },
+    { id: "car_insurance", name: "Car Insurance", budget: 70, icon: "🛡️" },
+    { id: "health_insurance", name: "Health Insurance", budget: 30, icon: "🏥" },
+    { id: "emi", name: "EMI (House)", budget: 50, icon: "🏠" },
+    { id: "family", name: "Family Support", budget: 25, icon: "👨‍👩‍👦" },
+    { id: "rego", name: "Rego", budget: 20, icon: "📋" },
+    { id: "lifestyle", name: "Lifestyle", budget: 100, icon: "🎯" },
   ],
 };
 
@@ -48,7 +48,7 @@ const getApiKey = () => store.get("apikey", "");
 // AI call helper
 const callAI = async (systemPrompt, userMessage) => {
   const apiKey = getApiKey();
-  if (!apiKey) return "\u26A0\uFE0F No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
+  if (!apiKey) return "⚠️ No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -67,19 +67,19 @@ const callAI = async (systemPrompt, userMessage) => {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      if (res.status === 401) return "\u26A0\uFE0F Invalid API key. Check your key in Settings.";
-      return `\u26A0\uFE0F API error: ${err.error?.message || res.statusText}`;
+      if (res.status === 401) return "⚠️ Invalid API key. Check your key in Settings.";
+      return `⚠️ API error: ${err.error?.message || res.statusText}`;
     }
     const data = await res.json();
     return data.content?.map(b => b.text || "").join("") || "No response received.";
   } catch (e) {
-    return "\u26A0\uFE0F Couldn't connect. Check your internet and try again.";
+    return "⚠️ Couldn't connect. Check your internet and try again.";
   }
 };
 
 const callAIChat = async (systemPrompt, messages) => {
   const apiKey = getApiKey();
-  if (!apiKey) return "\u26A0\uFE0F No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
+  if (!apiKey) return "⚠️ No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -97,13 +97,13 @@ const callAIChat = async (systemPrompt, messages) => {
       }),
     });
     if (!res.ok) {
-      if (res.status === 401) return "\u26A0\uFE0F Invalid API key. Check your key in Settings.";
-      return "\u26A0\uFE0F API error. Try again.";
+      if (res.status === 401) return "⚠️ Invalid API key. Check your key in Settings.";
+      return "⚠️ API error. Try again.";
     }
     const data = await res.json();
     return data.content?.map(b => b.text || "").join("") || "No response.";
   } catch {
-    return "\u26A0\uFE0F Couldn't connect. Try again.";
+    return "⚠️ Couldn't connect. Try again.";
   }
 };
 
@@ -149,11 +149,11 @@ const ProgressRing = ({ percent, size = 120, stroke = 8, color = "#34C759", bgCo
 
 // ─── Tab Bar ───
 const tabs = [
-  { id: "dashboard", label: "Dashboard", icon: "\u{1F4CA}" },
-  { id: "checkin", label: "Check-in", icon: "\u270F\uFE0F" },
-  { id: "think", label: "Think Again", icon: "\u{1F9E0}" },
-  { id: "coach", label: "Coach", icon: "\u{1F4AC}" },
-  { id: "debts", label: "Debts", icon: "\u{1F4C9}" },
+  { id: "dashboard", label: "Dashboard", icon: "📊" },
+  { id: "checkin", label: "Check-in", icon: "✏️" },
+  { id: "think", label: "Think Again", icon: "🧠" },
+  { id: "coach", label: "Coach", icon: "💬" },
+  { id: "debts", label: "Debts", icon: "📉" },
 ];
 
 const TabBar = ({ active, onChange }) => (
@@ -230,7 +230,7 @@ const Settings = ({ onClose }) => {
           background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 20,
           width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-        }}>\u2715</button>
+        }}>✕</button>
       </div>
 
       <Card>
@@ -251,7 +251,7 @@ const Settings = ({ onClose }) => {
             border: "none", borderRadius: 12, padding: "14px", color: "#fff",
             fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all .3s",
           }}>
-            {saved ? "\u2713 Saved!" : "Save Key"}
+            {saved ? "✓ Saved!" : "Save Key"}
           </button>
         </div>
       </Card>
@@ -311,11 +311,11 @@ const Dashboard = ({ weeklyData, debtPayments }) => {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.5, color: "#34C759" }}>
-              Phase {currentPhase?.id} \u2014 {currentPhase?.name}
+              Phase {currentPhase?.id} — {currentPhase?.name}
             </div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>{currentPhase?.range}</div>
           </div>
-          <div style={{ fontSize: 32 }}>\u26A1</div>
+          <div style={{ fontSize: 32 }}>⚡</div>
         </div>
       </Card>
 
@@ -535,7 +535,7 @@ const ThinkAgain = ({ debtPayments }) => {
   const analyze = async () => {
     setLoading(true);
     const text = await callAI(
-      `You are the "Think Again!" purchase advisor for Het. Brutally honest. Het's profile:\n- Weekly income: $${PROFILE.weeklyIncome}\n- Weekly expenses: $${PROFILE.weeklyExpenseTarget}\n- Weekly surplus: $${PROFILE.weeklySurplus}\n- Total remaining debt: $${totalRemaining.toLocaleString()}\n- Credit score: 275 (very low, recovering)\n- Currently in debt payoff mode\n\nResponse format:\n1. Start with EXACTLY one of: "\u2705 GO FOR IT", "\u23F3 NOT YET", or "\u{1F6AB} HARD NO"\n2. Blank line\n3. THE MATH: exact financial impact in 2-3 points\n4. THE REALITY CHECK: 2-3 sentences honest analysis\n5. THE VERDICT: specific advice\n\nBe specific with numbers. Show how many weeks it delays debt freedom.`,
+      `You are the "Think Again!" purchase advisor for Het. Brutally honest. Het's profile:\n- Weekly income: $${PROFILE.weeklyIncome}\n- Weekly expenses: $${PROFILE.weeklyExpenseTarget}\n- Weekly surplus: $${PROFILE.weeklySurplus}\n- Total remaining debt: $${totalRemaining.toLocaleString()}\n- Credit score: 275 (very low, recovering)\n- Currently in debt payoff mode\n\nResponse format:\n1. Start with EXACTLY one of: "✅ GO FOR IT", "⏳ NOT YET", or "🚫 HARD NO"\n2. Blank line\n3. THE MATH: exact financial impact in 2-3 points\n4. THE REALITY CHECK: 2-3 sentences honest analysis\n5. THE VERDICT: specific advice\n\nBe specific with numbers. Show how many weeks it delays debt freedom.`,
       `I want to buy: ${item}\nCost: $${cost}\nWhy: ${reason}\nMy plan to afford it: ${plan}\n\nShould I do this?`
     );
     setResult(text);
@@ -546,7 +546,7 @@ const ThinkAgain = ({ debtPayments }) => {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <Card style={{ background: "linear-gradient(135deg, rgba(131,56,236,0.1), rgba(131,56,236,0.02))", border: "0.5px solid rgba(131,56,236,0.15)" }}>
         <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>{"\u{1F9E0}"}</div>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>{"🧠"}</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>Think Again!</div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>Pitch your purchase. Get the truth.</div>
         </div>
@@ -582,13 +582,13 @@ const ThinkAgain = ({ debtPayments }) => {
           fontSize: 17, fontWeight: 700, cursor: loading || !item || !cost ? "default" : "pointer",
           opacity: !item || !cost ? 0.4 : 1, transition: "all .2s",
         }}>
-        {loading ? "Analyzing..." : "Think Again! \u{1F9E0}"}
+        {loading ? "Analyzing..." : "Think Again! 🧠"}
       </button>
 
       {result && (
         <Card style={{
-          background: result.startsWith("\u2705") ? "rgba(52,199,89,0.06)" : result.startsWith("\u23F3") ? "rgba(255,149,0,0.06)" : "rgba(255,59,48,0.06)",
-          border: `0.5px solid ${result.startsWith("\u2705") ? "rgba(52,199,89,0.15)" : result.startsWith("\u23F3") ? "rgba(255,149,0,0.15)" : "rgba(255,59,48,0.15)"}`,
+          background: result.startsWith("✅") ? "rgba(52,199,89,0.06)" : result.startsWith("⏳") ? "rgba(255,149,0,0.06)" : "rgba(255,59,48,0.06)",
+          border: `0.5px solid ${result.startsWith("✅") ? "rgba(52,199,89,0.15)" : result.startsWith("⏳") ? "rgba(255,149,0,0.15)" : "rgba(255,59,48,0.15)"}`,
         }}>
           <div style={{ fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap" }}>{result}</div>
         </Card>
@@ -609,7 +609,7 @@ const ThinkAgain = ({ debtPayments }) => {
 // ═══════════════════════════════════════════════
 const CoachChat = ({ debtPayments, weeklyData }) => {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hey Het! I'm your financial coach. Ask me anything \u2014 spending decisions, debt strategy, motivation, or just vent about money stress. I've got your full financial picture and I'll give it to you straight. \u{1F4AA}" }
+    { role: "assistant", content: "Hey Het! I'm your financial coach. Ask me anything — spending decisions, debt strategy, motivation, or just vent about money stress. I've got your full financial picture and I'll give it to you straight. 💪" }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -666,7 +666,7 @@ const CoachChat = ({ debtPayments, weeklyData }) => {
           placeholder="Ask your coach..." style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "12px 18px", color: "#fff", fontSize: 15, outline: "none" }} />
         <button onClick={send} disabled={loading || !input.trim()}
           style={{ background: "linear-gradient(135deg, #34C759, #30B350)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 18, opacity: !input.trim() ? 0.4 : 1, flexShrink: 0, color: "#fff", fontWeight: 700 }}>
-          \u2191
+          ↑
         </button>
       </div>
     </div>
@@ -739,7 +739,7 @@ const DebtTracker = ({ debtPayments, setDebtPayments }) => {
                     <input type="number" inputMode="numeric" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="Amount" autoFocus
                       style={{ background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 10px", color: "#fff", fontSize: 14, width: 90, fontFamily: "'SF Mono', ui-monospace, monospace", outline: "none" }} />
                     <button onClick={() => addPayment(debt.id)} style={{ background: "#34C759", border: "none", borderRadius: 8, padding: "6px 12px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Add</button>
-                    <button onClick={() => { setAddingTo(null); setPayAmount(""); }} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "6px 10px", color: "rgba(255,255,255,0.5)", fontSize: 13, cursor: "pointer" }}>\u2715</button>
+                    <button onClick={() => { setAddingTo(null); setPayAmount(""); }} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "6px 10px", color: "rgba(255,255,255,0.5)", fontSize: 13, cursor: "pointer" }}>✕</button>
                   </div>
                 ) : (
                   <button onClick={() => setAddingTo(debt.id)} style={{ background: "rgba(52,199,89,0.1)", border: "0.5px solid rgba(52,199,89,0.2)", borderRadius: 8, padding: "6px 14px", color: "#34C759", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ Payment</button>
@@ -800,7 +800,7 @@ export default function ThinkAgainApp() {
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.8, color: "#fff" }}>
-            {tab === "think" ? "\u{1F9E0} " : ""}{titles[tab]}
+            {tab === "think" ? "🧠 " : ""}{titles[tab]}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ background: "rgba(52,199,89,0.12)", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: "#34C759", letterSpacing: 0.5 }}>
@@ -810,7 +810,7 @@ export default function ThinkAgainApp() {
               background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
               width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", fontSize: 16, color: "rgba(255,255,255,0.5)",
-            }}>{"\u2699\uFE0F"}</button>
+            }}>{"⚙️"}</button>
           </div>
         </div>
       </div>
