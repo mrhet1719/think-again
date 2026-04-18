@@ -42,69 +42,34 @@ const store = {
   set: (key, val) => { try { localStorage.setItem(`ta_${key}`, JSON.stringify(val)); } catch {} },
 };
 
-// Get API key
-const getApiKey = () => store.get("apikey", "");
-
-// AI call helper
-const callAI = async (systemPrompt, userMessage) => {
-  const apiKey = getApiKey();
-  if (!apiKey) return "⚠️ No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      if (res.status === 401) return "⚠️ Invalid API key. Check your key in Settings.";
-      return `⚠️ API error: ${err.error?.message || res.statusText}`;
-    }
-    const data = await res.json();
-    return data.content?.map(b => b.text || "").join("") || "No response received.";
-  } catch (e) {
-    return "⚠️ Couldn't connect. Check your internet and try again.";
-  }
+// Helper: open Claude.ai with a pre-filled prompt
+const openClaude = (prompt) => {
+  const encoded = encodeURIComponent(prompt);
+  window.open(`https://claude.ai/new?q=${encoded}`, "_blank");
 };
 
-const callAIChat = async (systemPrompt, messages) => {
-  const apiKey = getApiKey();
-  if (!apiKey) return "⚠️ No API key set. Go to Settings (gear icon) to add your Anthropic API key.";
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: messages,
-      }),
-    });
-    if (!res.ok) {
-      if (res.status === 401) return "⚠️ Invalid API key. Check your key in Settings.";
-      return "⚠️ API error. Try again.";
-    }
-    const data = await res.json();
-    return data.content?.map(b => b.text || "").join("") || "No response.";
-  } catch {
-    return "⚠️ Couldn't connect. Try again.";
-  }
+// Build financial context string for prompts
+const getFinancialContext = (debtPayments) => {
+  const totalRemaining = PROFILE.debts.reduce((s, d) => {
+    const extra = (debtPayments[d.id] || []).reduce((a, p) => a + p.amount, 0);
+    return s + (d.total - d.paid - extra);
+  }, 0);
+  const debtDetails = PROFILE.debts.map(d => {
+    const extra = (debtPayments[d.id] || []).reduce((a, p) => a + p.amount, 0);
+    const remaining = d.total - d.paid - extra;
+    return `${d.name}: $${remaining} remaining`;
+  }).join(", ");
+
+  return `MY FINANCIAL PROFILE:
+- Weekly income: $1,300 (OFM $1,000 + DoorDash $300)
+- Weekly expense target: $420
+- Weekly surplus: $880
+- Total remaining debt: $${totalRemaining.toLocaleString()}
+- Credit score: 275 (recovering)
+- Lives in Australia, no rent, partner covers groceries/bills
+- Debts: ${debtDetails}
+- Core issue: cash flow mismanagement, not income
+- Phase: Stabilize → Clear obligations → Aggressive payoff`;
 };
 
 // ─── Animated Number ───
@@ -204,25 +169,24 @@ const inputStyle = {
   fontFamily: "'SF Mono', ui-monospace, monospace", outline: "none", boxSizing: "border-box",
 };
 
+const greenButton = {
+  background: "linear-gradient(135deg, #34C759, #30B350)",
+  border: "none", borderRadius: 14, padding: "16px", color: "#fff",
+  fontSize: 17, fontWeight: 700, cursor: "pointer", letterSpacing: 0.3,
+  width: "100%", textAlign: "center", display: "block",
+};
+
 // ═══════════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════════
 const Settings = ({ onClose }) => {
-  const [key, setKey] = useState(() => getApiKey());
-  const [saved, setSaved] = useState(false);
-
-  const save = () => {
-    store.set("apikey", key);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
       background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)",
       display: "flex", flexDirection: "column",
       padding: "env(safe-area-inset-top, 20px) 20px 20px",
+      overflowY: "auto",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>Settings</div>
@@ -234,41 +198,17 @@ const Settings = ({ onClose }) => {
       </div>
 
       <Card>
-        <SectionHead title="Anthropic API Key" subtitle="Required for AI features" />
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, margin: "0 0 16px" }}>
-          This key stays on your phone only. It is never sent anywhere except directly to Anthropic's servers.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="password"
-            value={key}
-            onChange={e => setKey(e.target.value)}
-            placeholder="sk-ant-api03-..."
-            style={inputStyle}
-          />
-          <button onClick={save} style={{
-            background: saved ? "#34C759" : "linear-gradient(135deg, #34C759, #30B350)",
-            border: "none", borderRadius: 12, padding: "14px", color: "#fff",
-            fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all .3s",
-          }}>
-            {saved ? "✓ Saved!" : "Save Key"}
-          </button>
-        </div>
-      </Card>
-
-      <Card style={{ marginTop: 16 }}>
-        <SectionHead title="How to get your API key" />
+        <SectionHead title="How It Works" />
         <div style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", lineHeight: 1.8 }}>
-          <div style={{ marginBottom: 8 }}><span style={{ color: "#34C759", fontWeight: 700 }}>1.</span> Go to <span style={{ color: "#fff", fontWeight: 600 }}>console.anthropic.com</span></div>
-          <div style={{ marginBottom: 8 }}><span style={{ color: "#34C759", fontWeight: 700 }}>2.</span> Sign up or log in</div>
-          <div style={{ marginBottom: 8 }}><span style={{ color: "#34C759", fontWeight: 700 }}>3.</span> Click <span style={{ color: "#fff", fontWeight: 600 }}>API Keys</span> in the sidebar</div>
-          <div style={{ marginBottom: 8 }}><span style={{ color: "#34C759", fontWeight: 700 }}>4.</span> Click <span style={{ color: "#fff", fontWeight: 600 }}>Create Key</span></div>
-          <div><span style={{ color: "#34C759", fontWeight: 700 }}>5.</span> Copy and paste it above</div>
+          <p style={{ margin: "0 0 12px" }}>This app uses your <span style={{ color: "#34C759", fontWeight: 700 }}>existing Claude Pro plan</span> for AI features — no extra cost.</p>
+          <p style={{ margin: "0 0 12px" }}>When you use <span style={{ color: "#fff", fontWeight: 600 }}>Think Again</span>, <span style={{ color: "#fff", fontWeight: 600 }}>Weekly Review</span>, or <span style={{ color: "#fff", fontWeight: 600 }}>AI Coach</span>, it opens Claude.ai with your financial data pre-loaded in the message.</p>
+          <p style={{ margin: 0 }}>Your tracking data (expenses, debt payments) is saved on your device.</p>
         </div>
       </Card>
 
       <Card style={{ marginTop: 16 }}>
         <SectionHead title="Reset All Data" />
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>This will delete all your check-in history and debt payment records from this device.</p>
         <button onClick={() => {
           if (window.confirm("This will delete ALL your check-in history and debt payment records. Are you sure?")) {
             localStorage.clear();
@@ -393,38 +333,48 @@ const Dashboard = ({ weeklyData, debtPayments }) => {
 // ═══════════════════════════════════════════════
 // WEEKLY CHECK-IN
 // ═══════════════════════════════════════════════
-const WeeklyCheckin = ({ weeklyData, setWeeklyData }) => {
+const WeeklyCheckin = ({ weeklyData, setWeeklyData, debtPayments }) => {
   const [expenses, setExpenses] = useState({});
   const [incomeOFM, setIncomeOFM] = useState("");
   const [incomeDD, setIncomeDD] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [review, setReview] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const totalSpent = Object.values(expenses).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const totalIncome = (parseFloat(incomeOFM) || 0) + (parseFloat(incomeDD) || 0);
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  const handleSubmit = () => {
     const weekData = { date: new Date().toISOString(), spent: totalSpent, income: totalIncome, breakdown: { ...expenses } };
     const updated = [...weeklyData, weekData];
     setWeeklyData(updated);
     store.set("weeks", updated);
-
-    const text = await callAI(
-      `You are Het's financial coach inside "Think Again!". Be direct, honest, tough but supportive. Weekly expense target: $${PROFILE.weeklyExpenseTarget}. Weekly income target: $${PROFILE.weeklyIncome}. Total remaining debt: ~$${PROFILE.debts.reduce((s,d) => s + d.total - d.paid, 0).toLocaleString()}. Respond in 3-4 short paragraphs. Start with verdict emoji + one-line verdict. Analyze spending. Give specific next-week advice. Be real.`,
-      `Weekly check-in:\n\nIncome: OFM $${incomeOFM || 0}, DoorDash $${incomeDD || 0} = $${totalIncome}\n\nExpenses:\n${PROFILE.expenseCategories.map(c => `- ${c.name}: $${expenses[c.id] || 0} (budget: $${c.budget})`).join("\n")}\n\nTotal spent: $${totalSpent} (target: $${PROFILE.weeklyExpenseTarget})\nSurplus: $${totalIncome - totalSpent}\n\nGive me your honest review.`
-    );
-    setReview(text);
     setSubmitted(true);
-    setLoading(false);
+  };
+
+  const getReviewPrompt = () => {
+    const context = getFinancialContext(debtPayments);
+    return `You are my financial coach. Be direct, honest, tough but supportive. Give me a weekly spending review.
+
+${context}
+
+HERE IS MY WEEKLY CHECK-IN:
+
+Income this week: OFM $${incomeOFM || 0}, DoorDash $${incomeDD || 0} = Total $${totalIncome}
+
+Expenses breakdown:
+${PROFILE.expenseCategories.map(c => `- ${c.name}: $${expenses[c.id] || 0} (budget: $${c.budget})`).join("\n")}
+
+Total spent: $${totalSpent} (target was $${PROFILE.weeklyExpenseTarget})
+${totalSpent <= PROFILE.weeklyExpenseTarget ? `UNDER budget by $${PROFILE.weeklyExpenseTarget - totalSpent}` : `OVER budget by $${totalSpent - PROFILE.weeklyExpenseTarget}`}
+Surplus this week: $${totalIncome - totalSpent}
+
+Give me your HONEST review: verdict emoji + one-line verdict, then analyze my spending, then specific advice for next week. Be real — if I overspent, say it plainly. If I did well, acknowledge it.`;
   };
 
   if (submitted) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Card style={{ background: "linear-gradient(135deg, rgba(52,199,89,0.1) 0%, rgba(52,199,89,0.02) 100%)", border: "0.5px solid rgba(52,199,89,0.15)" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "#34C759", marginBottom: 8 }}>Weekly Review</div>
+          <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "#34C759", marginBottom: 8 }}>Week Logged ✓</div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>SPENT</div>
@@ -435,12 +385,25 @@ const WeeklyCheckin = ({ weeklyData, setWeeklyData }) => {
               <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", fontFamily: "'SF Mono', ui-monospace, monospace" }}>${totalIncome}</div>
             </div>
           </div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>
+            Surplus: <span style={{ color: "#34C759", fontWeight: 700 }}>${totalIncome - totalSpent}</span>
+          </div>
         </Card>
-        <Card>
-          <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>AI Coach Says</div>
-          <div style={{ fontSize: 15, lineHeight: 1.65, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap" }}>{review}</div>
-        </Card>
-        <button onClick={() => { setSubmitted(false); setExpenses({}); setIncomeOFM(""); setIncomeDD(""); setReview(""); }}
+
+        <button onClick={() => openClaude(getReviewPrompt())} style={{
+          ...greenButton,
+          background: "linear-gradient(135deg, #8338EC, #6B2DC3)",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
+          <span>Get AI Review from Claude</span>
+          <span style={{ fontSize: 14 }}>↗</span>
+        </button>
+
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", lineHeight: 1.5 }}>
+          Opens Claude.ai with your spending data pre-loaded. Uses your existing Pro plan — no extra cost.
+        </div>
+
+        <button onClick={() => { setSubmitted(false); setExpenses({}); setIncomeOFM(""); setIncomeDD(""); }}
           style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px", color: "rgba(255,255,255,0.6)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
           New Check-in
         </button>
@@ -504,49 +467,47 @@ const WeeklyCheckin = ({ weeklyData, setWeeklyData }) => {
         </div>
       </Card>
 
-      <button onClick={handleSubmit} disabled={loading}
-        style={{
-          background: loading ? "rgba(52,199,89,0.3)" : "linear-gradient(135deg, #34C759, #30B350)",
-          border: "none", borderRadius: 14, padding: "16px", color: "#fff",
-          fontSize: 17, fontWeight: 700, cursor: loading ? "default" : "pointer", letterSpacing: 0.3,
-        }}>
-        {loading ? "Analyzing..." : "Submit & Get Review"}
+      <button onClick={handleSubmit} style={greenButton}>
+        Save Week ✓
       </button>
     </div>
   );
 };
 
 // ═══════════════════════════════════════════════
-// THINK AGAIN
+// THINK AGAIN (Purchase Advisor)
 // ═══════════════════════════════════════════════
 const ThinkAgain = ({ debtPayments }) => {
   const [item, setItem] = useState("");
   const [cost, setCost] = useState("");
   const [reason, setReason] = useState("");
   const [plan, setPlan] = useState("");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
 
-  const totalRemaining = PROFILE.debts.reduce((s, d) => {
-    const extra = (debtPayments[d.id] || []).reduce((a, p) => a + p.amount, 0);
-    return s + (d.total - d.paid - extra);
-  }, 0);
+  const getPrompt = () => {
+    const context = getFinancialContext(debtPayments);
+    return `You are my "Think Again!" purchase advisor. Be BRUTALLY honest.
 
-  const analyze = async () => {
-    setLoading(true);
-    const text = await callAI(
-      `You are the "Think Again!" purchase advisor for Het. Brutally honest. Het's profile:\n- Weekly income: $${PROFILE.weeklyIncome}\n- Weekly expenses: $${PROFILE.weeklyExpenseTarget}\n- Weekly surplus: $${PROFILE.weeklySurplus}\n- Total remaining debt: $${totalRemaining.toLocaleString()}\n- Credit score: 275 (very low, recovering)\n- Currently in debt payoff mode\n\nResponse format:\n1. Start with EXACTLY one of: "✅ GO FOR IT", "⏳ NOT YET", or "🚫 HARD NO"\n2. Blank line\n3. THE MATH: exact financial impact in 2-3 points\n4. THE REALITY CHECK: 2-3 sentences honest analysis\n5. THE VERDICT: specific advice\n\nBe specific with numbers. Show how many weeks it delays debt freedom.`,
-      `I want to buy: ${item}\nCost: $${cost}\nWhy: ${reason}\nMy plan to afford it: ${plan}\n\nShould I do this?`
-    );
-    setResult(text);
-    setLoading(false);
+${context}
+
+I WANT TO BUY: ${item}
+COST: $${cost}
+WHY: ${reason}
+MY PLAN TO AFFORD IT: ${plan}
+
+Give me your verdict:
+1. Start with EXACTLY one of: "✅ GO FOR IT", "⏳ NOT YET", or "🚫 HARD NO"
+2. THE MATH: Show exact financial impact — how many weeks this delays my debt freedom
+3. THE REALITY CHECK: 2-3 sentences of honest analysis
+4. THE VERDICT: Specific advice (when I could buy it, or what to do instead)
+
+Be specific with numbers. Don't sugarcoat it.`;
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <Card style={{ background: "linear-gradient(135deg, rgba(131,56,236,0.1), rgba(131,56,236,0.02))", border: "0.5px solid rgba(131,56,236,0.15)" }}>
         <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>{"🧠"}</div>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🧠</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>Think Again!</div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>Pitch your purchase. Get the truth.</div>
         </div>
@@ -575,31 +536,20 @@ const ThinkAgain = ({ debtPayments }) => {
         </div>
       </Card>
 
-      <button onClick={analyze} disabled={loading || !item || !cost}
+      <button onClick={() => openClaude(getPrompt())} disabled={!item || !cost}
         style={{
-          background: loading ? "rgba(131,56,236,0.3)" : "linear-gradient(135deg, #8338EC, #6B2DC3)",
-          border: "none", borderRadius: 14, padding: "16px", color: "#fff",
-          fontSize: 17, fontWeight: 700, cursor: loading || !item || !cost ? "default" : "pointer",
-          opacity: !item || !cost ? 0.4 : 1, transition: "all .2s",
+          ...greenButton,
+          background: !item || !cost ? "rgba(131,56,236,0.3)" : "linear-gradient(135deg, #8338EC, #6B2DC3)",
+          opacity: !item || !cost ? 0.4 : 1,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         }}>
-        {loading ? "Analyzing..." : "Think Again! 🧠"}
+        <span>Think Again! 🧠</span>
+        <span style={{ fontSize: 14 }}>↗</span>
       </button>
 
-      {result && (
-        <Card style={{
-          background: result.startsWith("✅") ? "rgba(52,199,89,0.06)" : result.startsWith("⏳") ? "rgba(255,149,0,0.06)" : "rgba(255,59,48,0.06)",
-          border: `0.5px solid ${result.startsWith("✅") ? "rgba(52,199,89,0.15)" : result.startsWith("⏳") ? "rgba(255,149,0,0.15)" : "rgba(255,59,48,0.15)"}`,
-        }}>
-          <div style={{ fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap" }}>{result}</div>
-        </Card>
-      )}
-
-      {result && (
-        <button onClick={() => { setResult(null); setItem(""); setCost(""); setReason(""); setPlan(""); }}
-          style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px", color: "rgba(255,255,255,0.6)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-          New Purchase Check
-        </button>
-      )}
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", lineHeight: 1.5 }}>
+        Opens Claude.ai with your purchase details and full financial profile. Uses your existing Pro plan.
+      </div>
     </div>
   );
 };
@@ -607,67 +557,72 @@ const ThinkAgain = ({ debtPayments }) => {
 // ═══════════════════════════════════════════════
 // AI COACH
 // ═══════════════════════════════════════════════
-const CoachChat = ({ debtPayments, weeklyData }) => {
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hey Het! I'm your financial coach. Ask me anything — spending decisions, debt strategy, motivation, or just vent about money stress. I've got your full financial picture and I'll give it to you straight. 💪" }
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const chatEnd = useRef(null);
+const CoachChat = ({ debtPayments }) => {
+  const [message, setMessage] = useState("");
 
-  useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const quickPrompts = [
+    { label: "Am I on track?", icon: "📍", prompt: "Am I on track with my financial plan? Review my current situation and tell me what I should focus on this week." },
+    { label: "Motivate me", icon: "💪", prompt: "I need motivation to stay on my financial plan. Remind me why I'm doing this and how close I am to being debt-free." },
+    { label: "What if scenario", icon: "🔮", prompt: "I want to run a what-if scenario. If I increase my DoorDash hours and earn an extra $200/week, how much faster would I be debt-free?" },
+    { label: "Spending check", icon: "🔍", prompt: "I'm about to spend money on something and I'm not sure if I should. Help me think through it." },
+  ];
 
-  const totalRemaining = PROFILE.debts.reduce((s, d) => {
-    const extra = (debtPayments[d.id] || []).reduce((a, p) => a + p.amount, 0);
-    return s + (d.total - d.paid - extra);
-  }, 0);
+  const buildPrompt = (userMsg) => {
+    const context = getFinancialContext(debtPayments);
+    return `You are my personal financial coach. Be direct, warm, honest — a coach, not a cheerleader. Use specific numbers from my profile.
 
-  const sysPrompt = `You are Het's personal financial coach inside "Think Again!". Be direct, warm, honest. Het's profile:\n- Weekly income: $1300 (OFM $1000 + DoorDash $300)\n- Weekly expense target: $420, surplus: $880\n- Total remaining debt: $${totalRemaining.toLocaleString()}\n- Credit score: 275 (recovering)\n- Lives in Australia, no rent, partner covers groceries/bills\n- Debts: ${PROFILE.debts.map(d => `${d.name}: $${d.total - d.paid - ((debtPayments[d.id] || []).reduce((a,p) => a + p.amount, 0))} remaining`).join(", ")}\n- Core issue: cash flow mismanagement, not income\nKeep responses concise (2-4 paragraphs). Use specific numbers. Be a coach, not a cheerleader.`;
+${context}
 
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg = { role: "user", content: input.trim() };
-    const history = [...messages, userMsg];
-    setMessages(history);
-    setInput("");
-    setLoading(true);
-
-    const apiMessages = history.filter((_, i) => i > 0).map(m => ({ role: m.role, content: m.content }));
-    const text = await callAIChat(sysPrompt, apiMessages);
-    setMessages([...history, { role: "assistant", content: text }]);
-    setLoading(false);
+MY QUESTION: ${userMsg}`;
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" }}>
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingBottom: 16 }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{
-            alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%",
-            background: m.role === "user" ? "linear-gradient(135deg, #34C759, #30B350)" : "rgba(255,255,255,0.06)",
-            borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-            padding: "12px 16px",
-            border: m.role === "user" ? "none" : "0.5px solid rgba(255,255,255,0.08)",
-          }}>
-            <div style={{ fontSize: 15, lineHeight: 1.6, color: m.role === "user" ? "#fff" : "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap" }}>{m.content}</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Card style={{ background: "linear-gradient(135deg, rgba(52,199,89,0.08), rgba(52,199,89,0.02))", border: "0.5px solid rgba(52,199,89,0.15)" }}>
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>AI Coach</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 4, lineHeight: 1.5 }}>
+            Ask anything about your finances. Opens Claude.ai with your full profile pre-loaded.
           </div>
+        </div>
+      </Card>
+
+      {/* Quick prompts */}
+      <SectionHead title="Quick Actions" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {quickPrompts.map((qp, i) => (
+          <Card key={i} onClick={() => openClaude(buildPrompt(qp.prompt))} style={{ cursor: "pointer", padding: 16, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>{qp.icon}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{qp.label}</div>
+          </Card>
         ))}
-        {loading && (
-          <div style={{ alignSelf: "flex-start", background: "rgba(255,255,255,0.06)", borderRadius: "18px 18px 18px 4px", padding: "12px 16px", border: "0.5px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ display: "flex", gap: 4 }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(255,255,255,0.3)", animation: `pulse 1.2s ease-in-out ${i * 0.15}s infinite` }} />)}
-            </div>
-          </div>
-        )}
-        <div ref={chatEnd} />
       </div>
-      <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: "0.5px solid rgba(255,255,255,0.06)" }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
-          placeholder="Ask your coach..." style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "12px 18px", color: "#fff", fontSize: 15, outline: "none" }} />
-        <button onClick={send} disabled={loading || !input.trim()}
-          style={{ background: "linear-gradient(135deg, #34C759, #30B350)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 18, opacity: !input.trim() ? 0.4 : 1, flexShrink: 0, color: "#fff", fontWeight: 700 }}>
-          ↑
-        </button>
+
+      {/* Custom message */}
+      <SectionHead title="Ask Anything" />
+      <Card>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          placeholder="e.g. Should I take on a side project for extra income? What's the fastest way to clear Latitude?"
+          style={{ ...inputStyle, minHeight: 100, resize: "vertical", fontFamily: "inherit" }}
+        />
+      </Card>
+
+      <button onClick={() => { if (message.trim()) openClaude(buildPrompt(message)); }}
+        disabled={!message.trim()}
+        style={{
+          ...greenButton,
+          opacity: !message.trim() ? 0.4 : 1,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
+        <span>Ask Claude</span>
+        <span style={{ fontSize: 14 }}>↗</span>
+      </button>
+
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", lineHeight: 1.5 }}>
+        Uses your existing Claude Pro plan — no extra cost.
       </div>
     </div>
   );
@@ -784,7 +739,6 @@ export default function ThinkAgainApp() {
       WebkitFontSmoothing: "antialiased", opacity: loaded ? 1 : 0, transition: "opacity 0.5s ease",
     }}>
       <style>{`
-        @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.2); }
         input:focus, textarea:focus { border-color: rgba(52,199,89,0.4) !important; }
@@ -810,16 +764,16 @@ export default function ThinkAgainApp() {
               background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
               width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", fontSize: 16, color: "rgba(255,255,255,0.5)",
-            }}>{"⚙️"}</button>
+            }}>⚙️</button>
           </div>
         </div>
       </div>
 
       <div style={{ padding: "16px 16px 100px", maxWidth: 500, margin: "0 auto" }}>
         {tab === "dashboard" && <Dashboard weeklyData={weeklyData} debtPayments={debtPayments} />}
-        {tab === "checkin" && <WeeklyCheckin weeklyData={weeklyData} setWeeklyData={setWeeklyData} />}
+        {tab === "checkin" && <WeeklyCheckin weeklyData={weeklyData} setWeeklyData={setWeeklyData} debtPayments={debtPayments} />}
         {tab === "think" && <ThinkAgain debtPayments={debtPayments} />}
-        {tab === "coach" && <CoachChat debtPayments={debtPayments} weeklyData={weeklyData} />}
+        {tab === "coach" && <CoachChat debtPayments={debtPayments} />}
         {tab === "debts" && <DebtTracker debtPayments={debtPayments} setDebtPayments={setDebtPayments} />}
       </div>
 
